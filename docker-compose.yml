@@ -1,6 +1,7 @@
 services:
   webrtc-app:
     build: .
+    network_mode: "host"
     ports:
       - "443:8443"   # HTTPS port (not 8080)
     volumes:
