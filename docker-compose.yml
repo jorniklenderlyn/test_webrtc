@@ -2,7 +2,7 @@ services:
   webrtc-app:
     build: .
     ports:
-      - "8443:8443"   # HTTPS port (not 8080)
+      - "443:8443"   # HTTPS port (not 8080)
     volumes:
       - ./certs:/app/certs:ro          # Mount certs
       - ./index.html:/app/index.html
