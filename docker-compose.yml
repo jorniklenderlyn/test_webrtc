@@ -2,15 +2,9 @@ services:
   webrtc-app:
     build: .
     ports:
-      - "443:443"   # HTTPS port (not 8080)
+      - "8443:8443"   # HTTPS port (not 8080)
     volumes:
       - ./certs:/app/certs:ro          # Mount certs
       - ./index.html:/app/index.html
       - ./client.js:/app/client.js
-    command: >
-      python server.py
-      --cert-file /app/certs/cert.pem
-      --key-file /app/certs/key.pem
-      --host 0.0.0.0
-      --port 443
     restart: unless-stopped
