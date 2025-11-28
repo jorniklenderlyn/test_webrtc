@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8443
 
 # Run the application
-CMD ["python", "server.py", "--cert-file", "/app/crts/cert.pem", "--key-file", "/app/crts/key.pem", "--host", "0.0.0.0", "--port", "8443"]
+CMD ["python", "server.py", "--cert-file", "/app/certs/cert.pem", "--key-file", "/app/certs/key.pem", "--host", "0.0.0.0", "--port", "8443"]
