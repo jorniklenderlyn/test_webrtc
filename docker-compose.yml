@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  webrtc-app:
+    build: .
+    ports:
+      - "8000:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+    volumes:
+      - ./static:/app/static
+      - ./certs:/app/certs:ro
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/snd:/dev/snd
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    restart: unless-stopped
+    networks:
+      - webrtc-network
+
+networks:
+  webrtc-network:
+    driver: bridge
