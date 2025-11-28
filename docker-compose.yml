@@ -11,9 +11,6 @@ services:
     volumes:
       - ./static:/app/static
       - ./certs:/app/certs:ro
-    devices:
-      - /dev/video0:/dev/video0
-      - /dev/snd:/dev/snd
     cap_add:
       - SYS_ADMIN
     security_opt:
