@@ -1,3 +1,10 @@
+# In server.py, before creating RTCPeerConnection
+import aioice
+
+# Disable UDP (NOT RECOMMENDED - high latency)
+aioice.ice.USE_ICE_TCP = True
+aioice.ice.USE_ICE_UDP = False
+
 import argparse
 import asyncio
 import json
