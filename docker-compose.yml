@@ -1,24 +1,16 @@
-version: '3.8'
-
 services:
   webrtc-app:
     build: .
     ports:
-      - "8000:8080"
-    environment:
-      - HOST=0.0.0.0
-      - PORT=8080
+      - "443:443"   # HTTPS port (not 8080)
     volumes:
-      - ./static:/app/static
-      - ./certs:/app/certs:ro
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
+      - ./certs:/app/certs:ro          # Mount certs
+      - ./index.html:/app/index.html
+      - ./client.js:/app/client.js
+    command: >
+      python server.py
+      --cert-file /app/certs/cert.pem
+      --key-file /app/certs/key.pem
+      --host 0.0.0.0
+      --port 443
     restart: unless-stopped
-    networks:
-      - webrtc-network
-
-networks:
-  webrtc-network:
-    driver: bridge
