@@ -7,4 +7,5 @@ services:
       - ./certs:/app/certs:ro          # Mount certs
       - ./index.html:/app/index.html
       - ./client.js:/app/client.js
+      - ./demo-instruct.wav:/app/demo-instruct.wav
     restart: unless-stopped
