@@ -10,3 +10,17 @@ services:
       - ./client.js:/app/client.js
       - ./demo-instruct.wav:/app/demo-instruct.wav
     restart: unless-stopped
+  coturn:
+    image: instrumentisto/coturn
+    network_mode: "host"
+    environment:
+      - TURN_EXTERNAL_IP=195.133.198.89
+      - TURN_PORT=443          # ← TURN on 443/TCP
+      - TURN_TLS_PORT=443      # ← TLS TURN also on 443
+      - TURN_USER=test
+      - TURN_PASSWORD=secret
+      - TURN_REALM=webrtc
+      - LETS_ENCRYPT_DOMAIN=   # Leave empty for self-signed
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
