@@ -26,7 +26,8 @@ function createPeerConnection() {
         // TURN over TCP on port 443 (fallback that always works)
         {
         urls: [
-            "turn:195.133.198.89:443?transport=tcp",
+            "turn:195.133.198.89:3478?transport=tcp",
+            "turn:195.133.198.89:3478?transport=udp",
             // "turn:127.0.0.1:443?transport=tcp"
         ],
         username: "test",
