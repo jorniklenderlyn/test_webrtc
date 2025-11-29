@@ -3,7 +3,7 @@ services:
     build: .
     network_mode: "host"
     ports:
-      - "443:8000"   # HTTPS port (not 8080)
+      - "443:443"   # HTTPS port (not 8080)
     volumes:
       - ./certs:/app/certs:ro          # Mount certs
       - ./index.html:/app/index.html

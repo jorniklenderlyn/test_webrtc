@@ -20,7 +20,7 @@ WORKDIR /app
 COPY . .
 
 # Expose the default port
-EXPOSE 8000
+EXPOSE 443
 
 # Run the application
-CMD ["python", "server.py", "--cert-file", "/app/certs/cert.pem", "--key-file", "/app/certs/key.pem", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "server.py", "--cert-file", "/app/certs/cert.pem", "--key-file", "/app/certs/key.pem", "--host", "0.0.0.0", "--port", "443"]
