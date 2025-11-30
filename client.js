@@ -23,11 +23,14 @@ function createPeerConnection() {
     iceServers: [
         // STUN (may fail, but try anyway)
         { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun.voipbuster.com:3478" },
+        { urls: "stun:stun.freeswitch.org:3478" },
+        { urls: "stun:stun.miwifi.com:3478" },
         // TURN over TCP on port 443 (fallback that always works)
         {
         urls: [
-            "turn:195.133.198.89:3478?transport=tcp",
-            "turn:195.133.198.89:3478?transport=udp",
+            "turn:195.133.198.89:8000?transport=tcp",
+            // "turn:195.133.198.89:3478?transport=udp",
             // "turn:127.0.0.1:443?transport=tcp"
         ],
         username: "test",

@@ -2,8 +2,8 @@ services:
   webrtc-app:
     build: .
     network_mode: "host"
-    ports:
-      - "443:443"   # HTTPS port (not 8080)
+    # ports:
+      # - "443:8000"   # HTTPS port (not 8080)
     volumes:
       - ./certs:/app/certs:ro          # Mount certs
       - ./index.html:/app/index.html
@@ -11,19 +11,13 @@ services:
       - ./demo-instruct.wav:/app/demo-instruct.wav
     restart: unless-stopped
   coturn:
-    image: instrumentisto/coturn
-    network_mode: "host"
-    environment:
-      - TURN_EXTERNAL_IP=195.133.198.89
-      # - TURN_EXTERNAL_IP=127.0.0.1
-      - TURN_PORT=3478          # ← TURN on 443/TCP
-      - TURN_TLS_PORT=3478      # ← TLS TURN also on 443
-      - TURN_USER=test
-      - TURN_PASSWORD=secret
-      - TURN_REALM=webrtc
-      - LETS_ENCRYPT_DOMAIN=   # Leave empty for self-signed
-    volumes:
-      - ./turnserver.conf:/etc/turnserver.conf:ro 
+    image: coturn/coturn:latest
+    container_name: coturn-tcp-only
+    network_mode: host
     cap_add:
       - NET_ADMIN
+    volumes:
+      - ./turnserver.conf:/etc/turnserver.conf
+      - ./logs:/var/log
+    command: ["turnserver", "-c", "/etc/turnserver.conf", "--no-udp", "--no-udp-relay"]
     restart: unless-stopped
