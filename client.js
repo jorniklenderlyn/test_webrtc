@@ -60,12 +60,13 @@ function createPeerConnection() {
     }, false);
     signalingLog.textContent = pc.signalingState;
 
-    // connect audio / video
     pc.addEventListener('track', function(evt) {
-        if (evt.track.kind == 'video')
-            document.getElementById('video').srcObject = evt.streams[0];
-        else
-            document.getElementById('audio').srcObject = evt.streams[0];
+        const remoteVideo = document.getElementById('remote-video');
+        if (evt.track.kind === 'video') {
+            remoteVideo.srcObject = evt.streams[0];
+        } else {
+            document.getElementById('remote-audio').srcObject = evt.streams[0]; // if you have audio element
+        }
     });
 
     return pc;
@@ -190,6 +191,10 @@ function start() {
             document.getElementById('media').style.display = 'block';
         }
         navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+            // ✅ Show local preview
+            document.getElementById('local-video').srcObject = stream;
+
+            // ✅ Send tracks to peer
             stream.getTracks().forEach(function(track) {
                 pc.addTrack(track, stream);
             });
@@ -197,6 +202,14 @@ function start() {
         }, function(err) {
             alert('Could not acquire media: ' + err);
         });
+        // navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+        //     stream.getTracks().forEach(function(track) {
+        //         pc.addTrack(track, stream);
+        //     });
+        //     return negotiate();
+        // }, function(err) {
+        //     alert('Could not acquire media: ' + err);
+        // });
     } else {
         negotiate();
     }

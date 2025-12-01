@@ -93,7 +93,12 @@
     <h2>Media</h2>
 
     <audio id="audio" autoplay="true"></audio>
-    <video id="video" autoplay="true" playsinline="true"></video>
+    <!-- <video id="video" autoplay="true" playsinline="true"></video> -->
+    <!-- Local preview (you) -->
+    <video id="local-video" autoplay muted playsinline style="width:320px"></video>
+
+    <!-- Remote stream (peer) -->
+    <video id="remote-video" autoplay playsinline style="width:320px"></video>
 </div>
 
 <h2>Data channel</h2>
