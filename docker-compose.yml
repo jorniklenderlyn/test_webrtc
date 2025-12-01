@@ -19,5 +19,5 @@ services:
     volumes:
       - ./turnserver.conf:/etc/turnserver.conf
       - ./logs:/var/log
-    command: ["turnserver", "-c", "/etc/turnserver.conf", "--no-udp", "--no-udp-relay"]
+    command: ["turnserver", "-c", "/etc/turnserver.conf"]
     restart: unless-stopped
