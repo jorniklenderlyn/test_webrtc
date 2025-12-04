@@ -1,212 +1,185 @@
-import argparse
-import asyncio
-import json
-import logging
-import os
-import ssl
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from typing import Dict, Optional
 import uuid
+import json
+import os
 
-import cv2
-from aiohttp import web
-from av import VideoFrame
+app = FastAPI()
 
-from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription
-from aiortc.contrib.media import MediaBlackhole, MediaPlayer, MediaRecorder
+class ConnectionManager:
+    def __init__(self):
+        # Store active connections: {user_id: websocket}
+        self.active_connections: Dict[str, WebSocket] = {}
+        # Store call pairs: {caller_id: callee_id, callee_id: caller_id}
+        self.call_pairs: Dict[str, str] = {}
+        # Store pending offers: {user_id: offer_data}
+        self.pending_offers: Dict[str, dict] = {}
 
-ROOT = os.path.dirname(__file__)
+    async def connect(self, websocket: WebSocket) -> str:
+        await websocket.accept()
+        user_id = str(uuid.uuid4())
+        self.active_connections[user_id] = websocket
+        print(f"User connected: {user_id}")
+        return user_id
 
-logger = logging.getLogger("pc")
-pcs = set()
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+        if user_id in self.call_pairs:
+            partner_id = self.call_pairs[user_id]
+            del self.call_pairs[user_id]
+            if partner_id in self.call_pairs:
+                del self.call_pairs[partner_id]
+        if user_id in self.pending_offers:
+            del self.pending_offers[user_id]
+        print(f"User disconnected: {user_id}")
 
+    async def send_message(self, user_id: str, message: dict):
+        if user_id in self.active_connections:
+            try:
+                await self.active_connections[user_id].send_json(message)
+            except WebSocketDisconnect:
+                self.disconnect(user_id)
 
-class VideoTransformTrack(MediaStreamTrack):
-    """
-    A video stream track that transforms frames from an another track.
-    """
+    async def broadcast_users_list(self):
+        users_list = {
+            "type": "users_list",
+            "users": list(self.active_connections.keys())
+        }
+        for user_id in self.active_connections:
+            await self.send_message(user_id, users_list)
 
-    kind = "video"
+    async def handle_signaling(self, sender_id: str, message: dict):
+        msg_type = message.get("type")
 
-    def __init__(self, track, transform):
-        super().__init__()  # don't forget this!
-        self.track = track
-        self.transform = transform
+        if msg_type == "incoming_call":
+            target_id = message.get("target")
+            print(target_id, self.active_connections)
+            if target_id in self.active_connections:
+                await self.send_message(target_id, {
+                    "type": "incoming_call",
+                    "caller": sender_id
+                })
+        
+        if msg_type == "offer":
+            # Store the offer and notify the receiver
+            target_id = message.get("target")
+            sdp = message.get("sdp")
+            if target_id in self.active_connections and sdp:
+                await self.send_message(target_id, {
+                    "type": "offer",
+                    "sdp": sdp,
+                    "sender": sender_id
+                })
+                self.call_pairs[sender_id] = target_id
+                self.call_pairs[target_id] = sender_id
+            else:
+                await self.send_message(sender_id, {
+                    "type": "error",
+                    "details": f"target_id: {target_id}, sdp: {sdp}"
+                })
+        
+        elif msg_type == "answer":
+            # Send answer to the original caller
+            target_id = message.get('target')
+            if target_id in self.active_connections:
+                await self.send_message(target_id, {
+                    "type": "answer",
+                    "sdp": message.get("sdp"),
+                    "callee": sender_id
+                })
+            # Create call pair
+            # self.call_pairs[caller_id] = sender_id
+            # self.call_pairs[sender_id] = caller_id
+        
+        elif msg_type == "ice_candidate":
+            # Forward ICE candidate to the partner
+            if sender_id in self.call_pairs:
+                partner_id = self.call_pairs[sender_id]
+                await self.send_message(partner_id, {
+                    "type": "ice_candidate",
+                    "candidate": message.get("candidate"),
+                    "sender": sender_id
+                })
+        
+        elif msg_type == "call_rejected":
+            # Handle call rejection
+            if sender_id in self.pending_offers:
+                offer_data = self.pending_offers[sender_id]
+                caller_id = offer_data["sender"]
+                await self.send_message(caller_id, {
+                    "type": "call_rejected",
+                    "callee": sender_id
+                })
+                del self.pending_offers[sender_id]
+        
+        elif msg_type == "call_ended":
+            # Handle call end
+            if sender_id in self.call_pairs:
+                partner_id = self.call_pairs[sender_id]
+                await self.send_message(partner_id, {
+                    "type": "call_ended",
+                    "sender": sender_id
+                })
+                del self.call_pairs[sender_id]
+                if partner_id in self.call_pairs:
+                    del self.call_pairs[partner_id]
 
-    async def recv(self):
-        frame = await self.track.recv()
+manager = ConnectionManager()
 
-        if self.transform == "cartoon":
-            img = frame.to_ndarray(format="bgr24")
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    user_id = None
+    try:
+        user_id = await manager.connect(websocket)
+        
+        # Send initial users list to the new user
+        await manager.send_message(user_id, {
+            "type": "self_id",
+            "user_id": user_id
+        })
+        await manager.broadcast_users_list()
+        
+        while True:
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                await manager.handle_signaling(user_id, message)
+            except json.JSONDecodeError:
+                print(f"Invalid JSON received from user {user_id}")
+            except Exception as e:
+                print(f"Error processing message: {e}")
+    
+    except WebSocketDisconnect:
+        if user_id:
+            manager.disconnect(user_id)
+            await manager.broadcast_users_list()
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        if user_id:
+            manager.disconnect(user_id)
+            await manager.broadcast_users_list()
 
-            # prepare color
-            img_color = cv2.pyrDown(cv2.pyrDown(img))
-            for _ in range(6):
-                img_color = cv2.bilateralFilter(img_color, 9, 9, 7)
-            img_color = cv2.pyrUp(cv2.pyrUp(img_color))
+@app.get("/")
+async def get():
+    return {
+        "message": "WebRTC Signaling Server",
+        "websocket_endpoint": "/ws",
+        "instructions": "Connect to WebSocket endpoint to start signaling"
+    }
 
-            # prepare edges
-            img_edges = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-            img_edges = cv2.adaptiveThreshold(
-                cv2.medianBlur(img_edges, 7),
-                255,
-                cv2.ADAPTIVE_THRESH_MEAN_C,
-                cv2.THRESH_BINARY,
-                9,
-                2,
-            )
-            img_edges = cv2.cvtColor(img_edges, cv2.COLOR_GRAY2RGB)
+app.mount("/static", StaticFiles(directory="static"))
 
-            # combine color and edges
-            img = cv2.bitwise_and(img_color, img_edges)
-
-            # rebuild a VideoFrame, preserving timing information
-            new_frame = VideoFrame.from_ndarray(img, format="bgr24")
-            new_frame.pts = frame.pts
-            new_frame.time_base = frame.time_base
-            return new_frame
-        elif self.transform == "edges":
-            # perform edge detection
-            img = frame.to_ndarray(format="bgr24")
-            img = cv2.cvtColor(cv2.Canny(img, 100, 200), cv2.COLOR_GRAY2BGR)
-
-            # rebuild a VideoFrame, preserving timing information
-            new_frame = VideoFrame.from_ndarray(img, format="bgr24")
-            new_frame.pts = frame.pts
-            new_frame.time_base = frame.time_base
-            return new_frame
-        elif self.transform == "rotate":
-            # rotate image
-            img = frame.to_ndarray(format="bgr24")
-            rows, cols, _ = img.shape
-            M = cv2.getRotationMatrix2D((cols / 2, rows / 2), frame.time * 45, 1)
-            img = cv2.warpAffine(img, M, (cols, rows))
-
-            # rebuild a VideoFrame, preserving timing information
-            new_frame = VideoFrame.from_ndarray(img, format="bgr24")
-            new_frame.pts = frame.pts
-            new_frame.time_base = frame.time_base
-            return new_frame
-        else:
-            return frame
-
-
-async def index(request):
-    content = open(os.path.join(ROOT, "index.html"), "r").read()
-    return web.Response(content_type="text/html", text=content)
-
-
-async def javascript(request):
-    content = open(os.path.join(ROOT, "client.js"), "r").read()
-    return web.Response(content_type="application/javascript", text=content)
-
-
-async def offer(request):
-    params = await request.json()
-    offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
-
-    pc = RTCPeerConnection()
-    pc_id = "PeerConnection(%s)" % uuid.uuid4()
-    pcs.add(pc)
-
-    def log_info(msg, *args):
-        logger.info(pc_id + " " + msg, *args)
-
-    log_info("Created for %s", request.remote)
-
-    # prepare local media
-    player = MediaPlayer(os.path.join(ROOT, "demo-instruct.wav"))
-    if args.write_audio:
-        recorder = MediaRecorder(args.write_audio)
-    else:
-        recorder = MediaBlackhole()
-
-    @pc.on("datachannel")
-    def on_datachannel(channel):
-        @channel.on("message")
-        def on_message(message):
-            if isinstance(message, str) and message.startswith("ping"):
-                channel.send("pong" + message[4:])
-
-    @pc.on("iceconnectionstatechange")
-    async def on_iceconnectionstatechange():
-        log_info("ICE connection state is %s", pc.iceConnectionState)
-        if pc.iceConnectionState == "failed":
-            await pc.close()
-            pcs.discard(pc)
-
-    @pc.on("track")
-    def on_track(track):
-        log_info("Track %s received", track.kind)
-
-        if track.kind == "audio":
-            pc.addTrack(player.audio)
-            recorder.addTrack(track)
-        elif track.kind == "video":
-            local_video = VideoTransformTrack(
-                track, transform=params["video_transform"]
-            )
-            pc.addTrack(local_video)
-
-        @track.on("ended")
-        async def on_ended():
-            log_info("Track %s ended", track.kind)
-            await recorder.stop()
-
-    # handle offer
-    await pc.setRemoteDescription(offer)
-    await recorder.start()
-
-    # send answer
-    answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
-
-    return web.Response(
-        content_type="application/json",
-        text=json.dumps(
-            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
-        ),
-    )
-
-
-async def on_shutdown(app):
-    # close peer connections
-    coros = [pc.close() for pc in pcs]
-    await asyncio.gather(*coros)
-    pcs.clear()
-
+@app.get("/app")
+async def index():
+    return FileResponse(path='static/index.html')
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="WebRTC audio / video / data-channels demo"
-    )
-    parser.add_argument("--cert-file", help="SSL certificate file (for HTTPS)")
-    parser.add_argument("--key-file", help="SSL key file (for HTTPS)")
-    parser.add_argument(
-        "--host", default="0.0.0.0", help="Host for HTTP server (default: 0.0.0.0)"
-    )
-    parser.add_argument(
-        "--port", type=int, default=8080, help="Port for HTTP server (default: 8080)"
-    )
-    parser.add_argument("--verbose", "-v", action="count")
-    parser.add_argument("--write-audio", help="Write received audio to a file")
-    args = parser.parse_args()
+    import uvicorn
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
-
-    if args.cert_file:
-        ssl_context = ssl.SSLContext()
-        ssl_context.load_cert_chain(args.cert_file, args.key_file)
-    else:
-        ssl_context = None
-
-    app = web.Application()
-    app.on_shutdown.append(on_shutdown)
-    app.router.add_get("/", index)
-    app.router.add_get("/client.js", javascript)
-    app.router.add_post("/offer", offer)
-    logging.info('start app')
-    web.run_app(
-        app, access_log=None, host=args.host, port=args.port, ssl_context=ssl_context
-    )
+    cert_dir = os.path.join(os.getcwd(), 'certs')
+    cert_path = os.path.join(cert_dir, 'cert.pem')
+    key_path = os.path.join(cert_dir, 'key.pem')
+    uvicorn.run(app, host="0.0.0.0", port=8001, ssl_certfile=cert_path, ssl_keyfile=key_path)

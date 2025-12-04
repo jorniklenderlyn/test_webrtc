@@ -6,8 +6,8 @@ services:
       # - "443:8000"   # HTTPS port (not 8080)
     volumes:
       - ./certs:/app/certs:ro          # Mount certs
-      - ./index.html:/app/index.html
-      - ./client.js:/app/client.js
+      - ./static/index.html:/app/static/index.html
+      - ./static/client.js:/app/static/client.js
       - ./demo-instruct.wav:/app/demo-instruct.wav
     restart: unless-stopped
   coturn:

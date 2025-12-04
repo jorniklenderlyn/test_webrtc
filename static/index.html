@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC 1-on-1 Calling</title>
+    <style>
+        .video-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        video {
+            width: 320px;
+            height: 240px;
+            border: 1px solid #ccc;
+        }
+        #usersList {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebRTC 1-on-1 Calling</h1>
+    
+    <div class="video-container">
+        <div>
+            <h3>Local Video</h3>
+            <video id="localVideo" autoplay muted></video>
+        </div>
+        <div>
+            <h3>Remote Video</h3>
+            <video id="remoteVideo" autoplay></video>
+        </div>
+    </div>
+    
+    <button id="endCallBtn">End Call</button>
+    
+    <div>
+        <h3>Available Users</h3>
+        <div id="usersList"></div>
+    </div>
+
+    <script src="static/client.js"></script>
+</body>
+</html>
