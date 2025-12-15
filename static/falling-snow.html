@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smooth Falling Snow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            height: 100vh;
+            background: linear-gradient(to bottom, #1a2980, #26d0ce);
+            position: relative;
+        }
+
+        .snow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .snowflake {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.8;
+            filter: blur(0.5px);
+            animation: snowfall linear infinite;
+        }
+
+        @keyframes snowfall {
+            0% {
+                transform: translateY(-20px) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.8;
+            }
+            90% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(100vh) translateX(0);
+                opacity: 0;
+            }
+        }
+
+        /* Content to show the background */
+        .content {
+            position: relative;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            z-index: 2;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to right, #ffffff, #a0f5f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin-bottom: 2rem;
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="snow-container" id="snow-container"></div>
+    
+    <div class="content">
+        <h1>Smooth Falling Snow</h1>
+        <p>Snowflakes move naturally from bottom to top without teleporting. Watch the continuous, smooth animation against the beautiful gradient background.</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const snowContainer = document.getElementById('snow-container');
+            const snowflakeCount = 150; // Number of snowflakes
+            
+            // Create snowflakes
+            for (let i = 0; i < snowflakeCount; i++) {
+                createSnowflake();
+            }
+            
+            function createSnowflake() {
+                const snowflake = document.createElement('div');
+                snowflake.classList.add('snowflake');
+                
+                // Random size between 2px and 8px
+                const size = Math.random() * 8 + 4;
+                snowflake.style.width = `${size}px`;
+                snowflake.style.height = `${size}px`;
+                
+                // Random starting position
+                const startX = Math.random() * 100;
+                snowflake.style.left = `${startX}%`;
+
+                snowflake.style.top = '-12px';
+                
+                // Random animation duration between 15s and 30s
+                const duration = Math.random() * 15 + 15;
+                snowflake.style.animationDuration = `${duration}s`;
+                
+                // Random delay to stagger start times
+                const delay = Math.random() * 16;
+                snowflake.style.animationDelay = `${delay}s`;
+                
+                // Random horizontal movement
+                const horizontalMove = (Math.random() - 0.5) * 40; // -20px to +20px
+                snowflake.style.animationName = `snowfall-${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Create unique keyframes for each snowflake to add horizontal drift
+                const keyframes = `
+                    @keyframes ${snowflake.style.animationName} {
+                        0% {
+                            transform: translateY(-20px) translateX(${horizontalMove * 0.1}px);
+                            opacity: 0;
+                        }
+                        10% {
+                            opacity: 0.8;
+                        }
+                        50% {
+                            transform: translateY(50vh) translateX(${horizontalMove * 0.5}px);
+                        }
+                        90% {
+                            opacity: 0.8;
+                        }
+                        100% {
+                            transform: translateY(100vh) translateX(${horizontalMove}px);
+                            opacity: 0;
+                        }
+                    }
+                `;
+                
+                // Add the keyframes to the document
+                const styleSheet = document.createElement('style');
+                styleSheet.textContent = keyframes;
+                document.head.appendChild(styleSheet);
+                
+                snowContainer.appendChild(snowflake);
+            }
+            
+            // Handle window resize
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    // Recreate snowflakes on resize for better performance
+                    snowContainer.innerHTML = '';
+                    for (let i = 0; i < snowflakeCount; i++) {
+                        createSnowflake();
+                    }
+                }, 250);
+            });
+        });
+    </script>
+</body>
+</html>

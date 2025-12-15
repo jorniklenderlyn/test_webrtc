@@ -1,0 +1,101 @@
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Modal Content */
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 90vw;
+  width: 360px;
+  text-align: center;
+  transform: scale(1);
+  transition: transform 0.3s ease;
+}
+
+.modal-overlay.hidden .modal-content {
+  transform: scale(0.95);
+}
+
+/* Header */
+.modal-header {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.modal-text {
+    margin-bottom: 16px;
+}
+
+/* Buttons Container */
+.call-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+/* Call Buttons */
+.call-button {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: none;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.call-button:hover {
+  transform: scale(1.05);
+}
+
+.call-button:active {
+  transform: scale(0.98);
+}
+
+/* Accept Button (Green) */
+.accept-btn {
+  background: #2ecc71;
+  color: white;
+}
+
+.accept-btn:hover {
+  background: #27ae60;
+}
+
+/* Decline Button (Red) */
+.decline-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.decline-btn:hover {
+  background: #c0392b;
+}

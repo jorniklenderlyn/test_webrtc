@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <title>Учебный проект</title>
+  <style>
+        * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+    }
+
+    .scene {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+    }
+
+    .scene.active {
+      display: flex;
+    }
+
+    .background-layer {
+        z-index: -1;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .aspect-ratio-box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .video-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* or 'cover', but no letterbox */
+    }
+
+    .video-bg-bg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* or 'cover', but no letterbox */
+        filter: blur(10px);
+        z-index: -2;
+    }
+
+    .video-area {
+        position: absolute;
+        aspect-ratio: 16/9;
+        /* transition: all 0.3s ease; */
+    }
+
+    .video-area.expanded {
+      position: absolute;
+      top: 0 ;
+      left: 0 ;
+      width: 100% ;
+      height: 100% ;
+      z-index: 50;
+    }
+
+    .video-area1 {
+        top: 55%;
+        left: 9.9%;
+        width: 390px;
+    }
+
+    .video-area1:hover .fullscreen-btn {
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    .video-area1:hover .fullscreen-btn .icon {
+        fill: rgba(255, 255, 255, 1);
+    }
+
+    .video-area1:hover .fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .video1 {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(255, 255, 0, 0.2);
+        border: 4px solid rgba(255, 255, 0, 0.5);
+    }
+
+    .video-area2 {
+        top: 55%;
+        left: 68.3%;
+        width: 390px;
+    }
+
+    .video-area2:hover .fullscreen-btn {
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    .video-area2:hover .fullscreen-btn .icon {
+        fill: rgba(255, 255, 255, 1);
+    }
+
+    .video-area2:hover .fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .video2 {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(255, 255, 0, 0.2);
+        border: 4px solid rgba(255, 255, 0, 0.5);
+    }
+
+    .fullscreen-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        background: rgba(0, 0, 0, 0.15);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 0;
+        z-index: 10;
+        transition: all 0.2s ease;
+    }
+
+    .fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+        /* transform: scale(1.1); */
+    }
+
+    .fullscreen-btn .icon {
+        width: 18px;
+        height: 18px;
+        fill: rgba(255, 255, 255, 0.5);
+        transition: all 0.2s ease;
+    }
+
+    /* Hide minimize icon by default */
+    .fullscreen-btn .minimize {
+        display: none;
+    }
+
+    /* Show minimize icon when in fullscreen */
+    .fullscreen-btn.fullscreen .minimize {
+        display: block;
+    }
+
+    .fullscreen-btn.fullscreen .maximize {
+        display: none;
+    }
+
+    /* Fullscreen overlay style */
+    /* .fullscreen-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .fullscreen-overlay video {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    } */
+
+    .tools {
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        padding: 8px;
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .video-grid {
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-grow: 1;
+    }
+
+    .call-area {
+        position: absolute;
+        top: 0;
+        height: 0;
+        z-index: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column
+    }
+
+    .center-elements {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .right-elements {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .end-btn {
+        cursor: pointer;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 16px;
+        background-color: rgba(255, 0, 0, 0.3);
+        color: rgba(255, 255, 255, 0.7);
+        transition: background-color 0.2s, color 0.2s;
+    }
+    .end-btn:hover {
+        cursor: pointer;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 16px;
+        background-color: rgba(255, 0, 0, 0.5);
+        color: rgba(255, 255, 255, 0.9);
+    }
+    .icon { 
+        font-size: 22px;
+    }
+    .callee-list-area {
+        width: 100%;
+        overflow-y: auto;
+        /* flex-grow: 1; */
+        background-color: white; 
+    }
+    .username-form {
+        display: flex;
+        width: 100%;
+        margin-top: 8px;
+        margin-bottom: 8px;
+        gap: 8px;
+    }
+    .username-validation {
+        background-color: white;
+        color: black;
+        display: none;
+    }
+    .calling-text {
+        background-color: white;
+        color: black;
+    }
+
+    .start-screen-content-area {
+        display: flex;
+        /* justify-content: center; */
+        align-items: center;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+    }
+
+    .call-form {
+        height: 80vh;
+        width: 512px;
+        margin-top: 16px;
+        display: flex;
+        /* justify-content: center; */
+        flex-direction: column;
+        background-color: whitesmoke;
+        border-radius: 8px;
+        padding: 8px 8px;
+    }
+
+    #user-name {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 1rem;
+        /* margin-bottom: 16px; */
+        flex-grow: 1;
+    }
+
+    #save-name {
+        background: #4a6cf7;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        /* margin-bottom: 24px; */
+    }
+
+    #save-name:hover {
+         background: #3a5ce5;
+    }
+
+    .app-header {
+        margin-top: 24px;
+        color: whitesmoke;
+        margin-bottom: 8px;
+    }
+
+    #start-screen {
+        background: linear-gradient(to bottom, #1a2980, #26d0ce);
+    }
+  </style>
+  <link rel="stylesheet" type="text/css" href="./static/callModal.css"></link>
+  <link rel="stylesheet" type="text/css" href="./static/incomingCallModal.css"></link>
+  <link rel="stylesheet" type="text/css" href="./static/usersList.css"></link>
+  <link rel="stylesheet" type="text/css" href="./static/snowFall.css"></link>
+</head>
+<body>
+    <div id="start-screen" class="scene active">
+        <div class="snow-container" id="snow-container"></div>
+        <div class="start-screen-content-area">
+            <div class="app-header">
+                <h1>Учебный звонок</h1>
+            </div>
+            <div class="call-form">
+                <h3>Ваше имя:</h3>
+                <div class="username-form">
+                    <input 
+                        type="text"
+                        id="user-name"
+                        placeholder="Введите имя"
+                    >
+                    <button id="save-name">
+                        <i class="fas fa-floppy-disk"></i>
+                        Сохранить
+                    </button>
+                </div>
+                <div id="username-validation" class="username-validation"></div>
+                <h3>Оналйн пользователи:</h3>
+                <div id="callee-list-area" class="callee-list-area"></div>
+            </div>
+        </div>
+    </div>
+    <div id="call-screen" class="scene">
+        <div class="background-layer">
+            <video class="video-bg-bg" autoplay muted loop playsinline>
+                <source src="./static/generated-video.mp4" type="video/mp4" />
+            </video>
+            <!-- <video class="video-bg" autoplay muted loop playsinline>
+                <source src="./generated-video.mp4" type="video/mp4" />
+            </video> -->
+        </div>
+        <div class="call-area">
+            <div class="video-grid">
+                <div class="aspect-ratio-box">
+                    <!-- video frame 1 -->
+                    <div class="video-area video-area1">
+                        <video id='video1' class="video1" autoplay muted playsinline></video>
+                        <button class="fullscreen-btn"  data-target="video1" data-container="video-area1">
+                            <svg class="icon maximize" viewBox="0 0 24 24">
+                                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                            </svg>
+                            <svg class="icon minimize" viewBox="0 0 24 24">
+                                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <!-- video frame 2 -->
+                    <div class="video-area video-area2">
+                        <video id='video2' class="video2" autoplay muted playsinline></video>
+                        <button class="fullscreen-btn"  data-target="video2" data-container="video-area2">
+                            <svg class="icon maximize" viewBox="0 0 24 24">
+                                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                            </svg>
+                            <svg class="icon minimize" viewBox="0 0 24 24">
+                                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="tools">
+                <div class="right-elements">
+                    <button id="end-btn" class="end-btn">
+                        <i class="fas fa-phone-slash icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="./static/SnowFall.js"></script>
+    <script src="./static/utils.js"></script>
+    <script src="./static/CallModal.js"></script>
+    <script src="./static/IncomingCallModal.js"></script>
+    <script src="./static/UsersList.js"></script>
+    <script src="./static/signalManager.js"></script>
+    <script src="./static/logic.js"></script>
+    
+</body>
+</html>

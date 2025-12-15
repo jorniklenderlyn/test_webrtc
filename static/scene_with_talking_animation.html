@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css  ">
+  <title>16:9 Video with Rectangles (CSS Only)</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+    }
+
+    .background-layer {
+        z-index: -1;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .aspect-ratio-box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .video-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* or 'cover', but no letterbox */
+    }
+
+    .video-bg-bg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* or 'cover', but no letterbox */
+        filter: blur(15px);
+        z-index: -2;
+    }
+
+    .rect2 {
+      top: 55%;
+      left: 68.3%;
+      width: 21%;
+      aspect-ratio: 16/9;
+    }
+
+    .video-area {
+        position: absolute;
+        top: 55%;
+        left: 9.9%;
+        width: 330px;
+        aspect-ratio: 16/9;
+    }
+
+    .video1 {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(255, 255, 0, 0.2);
+        border: 4px solid rgba(255, 255, 0, 0.5); /* Default silent state - 0.5 opacity */
+        transition: border-color 0.3s ease; /* Smooth transition */
+    }
+
+    .video1.speaking {
+        border-color: rgba(255, 255, 0, 1); /* Speaking state - 100% opacity */
+    }
+
+    .video2 {
+        object-fit: cover;
+    }
+
+    .fullscreen-btn {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        background: rgba(255, 255, 0, 0.8);
+        border: 2px solid #000;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 0;
+        z-index: 10;
+        transition: all 0.2s ease;
+    }
+
+    .fullscreen-btn:hover {
+        background: rgba(255, 255, 0, 1);
+        transform: scale(1.1);
+    }
+
+    .fullscreen-btn .icon {
+        width: 18px;
+        height: 18px;
+        fill: #000;
+    }
+
+    /* Hide minimize icon by default */
+    .fullscreen-btn .minimize {
+        display: none;
+    }
+
+    /* Show minimize icon when in fullscreen */
+    .fullscreen-btn.fullscreen .minimize {
+        display: block;
+    }
+
+    .fullscreen-btn.fullscreen .maximize {
+        display: none;
+    }
+
+    /* Fullscreen overlay style */
+    .fullscreen-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .fullscreen-overlay video {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
+
+    .tools {
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        padding: 8px;
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .video-grid {
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-grow: 1;
+    }
+
+    .call-area {
+        position: absolute;
+        top: 0;
+        height: 0;
+        z-index: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column
+    }
+
+    .center-elements {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .right-elements {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .end-btn {
+        cursor: pointer;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 16px;
+        background-color: rgba(255, 0, 0, 0.3);
+        color: rgba(255, 255, 255, 0.7);
+        transition: background-color 0.2s, color 0.2s;
+    }
+    .end-btn:hover {
+        cursor: pointer;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 16px;
+        background-color: rgba(255, 0, 0, 0.5);
+        color: rgba(255, 255, 255, 0.9);
+    }
+    .icon { 
+        font-size: 22px;
+    }
+  </style>
+</head>
+<body>
+    <div class="background-layer">
+        <video class="video-bg-bg" autoplay muted loop playsinline>
+            <source src="./generated-video.mp4" type="video/mp4" />
+        </video>
+        <video class="video-bg" autoplay muted loop playsinline>
+            <source src="./generated-video.mp4" type="video/mp4" />
+        </video>
+    </div>
+    <div class="call-area">
+        <div class="video-grid">
+            <div class="aspect-ratio-box">
+                <!-- video frame 1 -->
+                <div class="video-area">
+                    <video id='video1' class="video1" autoplay muted playsinline>
+                    </video>
+                </div>
+                <!-- video frame 2 -->
+                <!-- <div class="rectangle rect2">
+                    <video id='video2' autoplay muted playsinline></video>
+                    <button class="fullscreen-btn" data-target="video2">
+                        <svg class="icon maximize" viewBox="0 0 24 24">
+                            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                        </svg>
+                        <svg class="icon minimize" viewBox="0 0 24 24" style="display:none;">
+                            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                        </svg>
+                    </button>
+                </div> -->
+            </div>
+        </div>
+        <div class="tools">
+            <div class="right-elements">
+                <button class="end-btn">
+                    <i class="fas fa-phone-slash icon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const video1 = document.getElementById('video1');
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+        let microphoneStream = null;
+        const SPEAKING_THRESHOLD = 0.001; // Adjust this threshold as needed
+        const UPDATE_INTERVAL = 100; // ms
+        let isSpeaking = false;
+        let animationFrameId = null;
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+                
+                // Set video stream
+                video1.srcObject = stream;
+                
+                // Set up audio analysis
+                setupAudioAnalysis(stream);
+                
+            } catch (err) {
+                console.error('Error accessing media devices:', err);
+                alert('Error accessing camera/microphone. Please make sure you have granted permissions.');
+            }
+        }
+
+        function setupAudioAnalysis(stream) {
+            try {
+                // Get the audio track from the stream
+                const audioTracks = stream.getAudioTracks();
+                if (audioTracks.length === 0) {
+                    console.error('No audio tracks found in the stream');
+                    return;
+                }
+                
+                microphoneStream = stream;
+                
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create analyser node
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256; // Smaller FFT size for better performance
+                
+                // Create data array for frequency data
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                // Create media stream source from the audio track
+                const source = audioContext.createMediaStreamSource(stream);
+                
+                // Connect source to analyser
+                source.connect(analyser);
+                
+                // Start audio analysis
+                analyzeAudio();
+                
+            } catch (err) {
+                console.error('Error setting up audio analysis:', err);
+            }
+        }
+
+        function analyzeAudio() {
+            if (!analyser || !dataArray) return;
+            
+            // Get frequency data
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate average volume (focus on voice frequencies)
+            let sum = 0;
+            // Focus on frequencies where human speech is most prominent (300Hz - 3000Hz)
+            const sampleRate = audioContext.sampleRate;
+            const nyquist = sampleRate / 2;
+            const binCount = analyser.frequencyBinCount;
+            
+            // Calculate frequency range indices for human speech
+            const minFreq = 300; // Hz
+            const maxFreq = 3000; // Hz
+            const minBin = Math.floor((minFreq / nyquist) * binCount);
+            const maxBin = Math.floor((maxFreq / nyquist) * binCount);
+            
+            for (let i = minBin; i < maxBin && i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            
+            const average = sum / (maxBin - minBin);
+            const normalizedVolume = average / 255; // Normalize to 0-1 range
+            
+            // Determine if speaking based on threshold
+            const currentlySpeaking = normalizedVolume > SPEAKING_THRESHOLD;
+            
+            // Only update if state changed to avoid flickering
+            if (currentlySpeaking !== isSpeaking) {
+                isSpeaking = currentlySpeaking;
+                updateBorderOpacity();
+            }
+            
+            // Continue analysis
+            animationFrameId = requestAnimationFrame(analyzeAudio);
+        }
+
+        function updateBorderOpacity() {
+            if (video1) {
+                if (isSpeaking) {
+                    video1.classList.add('speaking');
+                } else {
+                    video1.classList.remove('speaking');
+                }
+            }
+        }
+
+        function stopAudioAnalysis() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+            }
+            
+            if (analyser) {
+                analyser.disconnect();
+                analyser = null;
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+        }
+
+        // Add fullscreen toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add fullscreen toggle functionality to all buttons
+            const fullscreenButtons = document.querySelectorAll('.fullscreen-btn');
+            
+            fullscreenButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetVideoId = this.getAttribute('data-target');
+                    const videoElement = document.getElementById(targetVideoId);
+                    toggleFullscreen(videoElement, this);
+                });
+            });
+
+            // ESC key to exit fullscreen
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && document.fullscreenElement) {
+                    document.exitFullscreen();
+                    updateButtonStates();
+                }
+            });
+
+            // Listen for fullscreen change events
+            document.addEventListener('fullscreenchange', updateButtonStates);
+            
+            // Clean up on page unload
+            window.addEventListener('beforeunload', function() {
+                stopAudioAnalysis();
+            });
+        });
+
+        function toggleFullscreen(element, button) {
+            if (!document.fullscreenElement) {
+                // Enter fullscreen
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                } else if (element.mozRequestFullScreen) { // Firefox
+                    element.mozRequestFullScreen();
+                } else if (element.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                    element.webkitRequestFullscreen();
+                } else if (element.msRequestFullscreen) { // IE/Edge
+                    element.msRequestFullscreen();
+                }
+                button.classList.add('fullscreen');
+            } else {
+                // Exit fullscreen
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { // Firefox
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { // Chrome, Safari and Opera
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { // IE/Edge
+                    document.msExitFullscreen();
+                }
+                button.classList.remove('fullscreen');
+            }
+        }
+
+        function updateButtonStates() {
+            const buttons = document.querySelectorAll('.fullscreen-btn');
+            buttons.forEach(button => {
+                const targetVideoId = button.getAttribute('data-target');
+                const videoElement = document.getElementById(targetVideoId);
+                
+                if (document.fullscreenElement === videoElement) {
+                    button.classList.add('fullscreen');
+                } else {
+                    button.classList.remove('fullscreen');
+                }
+            });
+        }
+
+        // Start camera and audio analysis
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            startCamera();
+        } else {
+            console.error('getUserMedia not supported');
+            alert('Your browser does not support camera/microphone access.');
+        }
+    </script>
+</body>
+</html>

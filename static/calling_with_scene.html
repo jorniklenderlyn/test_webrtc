@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <title>Video Call App</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      color: white;
+      overflow: hidden;
+    }
+
+    /* Scene Management */
+    .scene {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+    }
+
+    .scene.active {
+      display: flex;
+    }
+
+    /* START SCREEN STYLES */
+    #start-screen {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 2rem;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+    }
+
+    .app-header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .app-header h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #4cc9f0, #4361ee);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .app-header p {
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+
+    .input-section {
+      width: 100%;
+      max-width: 400px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .input-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: white;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: #4361ee;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .input-group input::placeholder {
+      color: #64748b;
+    }
+
+    .start-call-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 1.5rem;
+    }
+
+    .start-call-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(67, 97, 238, 0.4);
+    }
+
+    .start-call-btn:active {
+      transform: translateY(0);
+    }
+
+    .call-list {
+      width: 100%;
+      max-width: 400px;
+      margin-top: 1rem;
+    }
+
+    .call-list h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: #e2e8f0;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .call-list-item {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .call-list-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateX(5px);
+      border-color: rgba(67, 97, 238, 0.3);
+    }
+
+    .call-info {
+      flex: 1;
+    }
+
+    .call-name {
+      font-weight: 600;
+      font-size: 1rem;
+      color: white;
+      margin-bottom: 0.25rem;
+    }
+
+    .call-time {
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .call-join-btn {
+      background: rgba(67, 97, 238, 0.2);
+      color: #4cc9f0;
+      border: 1px solid rgba(67, 97, 238, 0.4);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .call-join-btn:hover {
+      background: rgba(67, 97, 238, 0.3);
+    }
+
+    /* CALL SCREEN STYLES (existing with adjustments) */
+    .background-layer {
+        z-index: -1;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .aspect-ratio-box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .video-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .video-bg-bg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: blur(10px);
+        z-index: -2;
+    }
+
+    .video-area1 {
+        position: absolute;
+        top: 55%;
+        left: 9.9%;
+        width: 390px;
+        aspect-ratio: 16/9;
+    }
+
+    .video-area1:hover .fullscreen-btn {
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    .video-area1:hover .fullscreen-btn .icon {
+        fill: rgba(255, 255, 255, 1);
+    }
+
+    .video-area1:hover .fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .video1 {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(255, 255, 0, 0.2);
+        border: 4px solid rgba(255, 255, 0, 0.5);
+    }
+
+    .video-area2 {
+        position: absolute;
+        top: 55%;
+        left: 68.3%;
+        width: 390px;
+        aspect-ratio: 16/9;
+    }
+
+    .video-area2:hover .fullscreen-btn {
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    .video-area2:hover .fullscreen-btn .icon {
+        fill: rgba(255, 255, 255, 1);
+    }
+
+    .video-area2:hover .fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .video2 {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(255, 255, 0, 0.2);
+        border: 4px solid rgba(255, 255, 0, 0.5);
+    }
+
+    .fullscreen-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        background: rgba(0, 0, 0, 0.15);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 0;
+        z-index: 10;
+        transition: all 0.2s ease;
+    }
+
+    .fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .fullscreen-btn .icon {
+        width: 18px;
+        height: 18px;
+        fill: rgba(255, 255, 255, 0.5);
+        transition: all 0.2s ease;
+    }
+
+    /* Hide minimize icon by default */
+    .fullscreen-btn .minimize {
+        display: none;
+    }
+
+    /* Show minimize icon when in fullscreen */
+    .fullscreen-btn.fullscreen .minimize {
+        display: block;
+    }
+
+    .fullscreen-btn.fullscreen .maximize {
+        display: none;
+    }
+
+    /* Fullscreen overlay style */
+    .fullscreen-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .fullscreen-overlay video {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
+
+    .tools {
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        padding: 8px;
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .video-grid {
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-grow: 1;
+    }
+
+    .call-area {
+        position: absolute;
+        top: 0;
+        height: 0;
+        z-index: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column
+    }
+
+    .center-elements {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .right-elements {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .end-btn {
+        cursor: pointer;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 16px;
+        background-color: rgba(255, 0, 0, 0.3);
+        color: rgba(255, 255, 255, 0.7);
+        transition: background-color 0.2s, color 0.2s;
+    }
+    .end-btn:hover {
+        cursor: pointer;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 16px;
+        background-color: rgba(255, 0, 0, 0.5);
+        color: rgba(255, 255, 255, 0.9);
+    }
+    .icon { 
+        font-size: 22px;
+    }
+
+    .participant-name {
+      color: white;
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      margin-right: 1rem;
+    }
+
+    .christmas-tree {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+    }
+  </style>
+</head>
+<body>
+    <!-- START SCREEN -->
+    <div id="start-screen" class="scene active">
+        <img src="./tree.png" class="christmas-tree">
+        <div class="app-header">
+            <h1>VideoCall Pro</h1>
+            <p>Connect with anyone, anywhere</p>
+        </div>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <label for="userName">Your Name</label>
+                <input 
+                    type="text" 
+                    id="userName" 
+                    placeholder="Enter your name"
+                    value="Guest User"
+                >
+            </div>
+            
+            <button id="startNewCall" class="start-call-btn">
+                <i class="fas fa-video"></i> Start New Call
+            </button>
+            
+            <div class="call-list">
+                <h2>Recent Calls</h2>
+                <div class="call-list-container" id="callList">
+                    <!-- Calls will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CALL SCREEN -->
+    <div id="call-screen" class="scene">
+        <div class="background-layer">
+            <video class="video-bg-bg" autoplay muted loop playsinline>
+                <source src="./generated-video.mp4" type="video/mp4" />
+            </video>
+        </div>
+        <div class="call-area">
+            <div class="video-grid">
+                <div class="aspect-ratio-box">
+                    <!-- video frame 1 -->
+                    <div class="video-area1">
+                        <video id='video1' class="video1" autoplay muted playsinline></video>
+                        <button class="fullscreen-btn" data-target="video1">
+                            <svg class="icon maximize" viewBox="0 0 24 24">
+                                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                            </svg>
+                            <svg class="icon minimize" viewBox="0 0 24 24" style="display:none;">
+                                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <!-- video frame 2 -->
+                    <div class="video-area2">
+                        <video id='video2' class="video2" autoplay muted playsinline></video>
+                        <button class="fullscreen-btn" data-target="video2">
+                            <svg class="icon maximize" viewBox="0 0 24 24">
+                                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                            </svg>
+                            <svg class="icon minimize" viewBox="0 0 24 24" style="display:none;">
+                                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="tools">
+                <div class="right-elements">
+                    <div class="participant-name" id="currentParticipantName">
+                        Guest User
+                    </div>
+                    <button class="end-btn" id="endCallBtn">
+                        <i class="fas fa-phone-slash icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        const appState = {
+            currentUser: "Guest User",
+            currentCall: null,
+            callHistory: [
+                { id: 1, name: "John Doe", time: "10:30 AM", date: "2024-01-15" },
+                { id: 2, name: "Team Meeting", time: "Yesterday", date: "2024-01-14" },
+                { id: 3, name: "Sarah Smith", time: "Jan 12", date: "2024-01-12" },
+                { id: 4, name: "Alex Johnson", time: "Jan 10", date: "2024-01-10" },
+                { id: 5, name: "Design Review", time: "Jan 8", date: "2024-01-08" }
+            ],
+            isInCall: false,
+            mediaStream: null
+        };
+
+        // DOM Elements
+        const startScreen = document.getElementById('start-screen');
+        const callScreen = document.getElementById('call-screen');
+        const userNameInput = document.getElementById('userName');
+        const startNewCallBtn = document.getElementById('startNewCall');
+        const callListContainer = document.getElementById('callList');
+        const endCallBtn = document.getElementById('endCallBtn');
+        const currentParticipantName = document.getElementById('currentParticipantName');
+        const video1 = document.getElementById('video1');
+        const video2 = document.getElementById('video2');
+
+        // Initialize app
+        function initApp() {
+            renderCallList();
+            setupEventListeners();
+        }
+
+        // Render call list
+        function renderCallList() {
+            callListContainer.innerHTML = '';
+            
+            appState.callHistory.forEach(call => {
+                const callElement = document.createElement('div');
+                callElement.className = 'call-list-item';
+                callElement.dataset.callId = call.id;
+                
+                callElement.innerHTML = `
+                    <div class="call-info">
+                        <div class="call-name">${call.name}</div>
+                        <div class="call-time">${call.time} • ${call.date}</div>
+                    </div>
+                    <button class="call-join-btn" data-call-id="${call.id}">
+                        <i class="fas fa-phone-alt"></i> Join
+                    </button>
+                `;
+                
+                callListContainer.appendChild(callElement);
+            });
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Start new call button
+            startNewCallBtn.addEventListener('click', () => {
+                startCall({
+                    id: Date.now(),
+                    name: 'New Call',
+                    time: 'Now',
+                    date: new Date().toLocaleDateString()
+                });
+            });
+
+            // Join call from list
+            callListContainer.addEventListener('click', (e) => {
+                const joinBtn = e.target.closest('.call-join-btn');
+                if (joinBtn) {
+                    const callId = joinBtn.dataset.callId;
+                    const call = appState.callHistory.find(c => c.id === parseInt(callId));
+                    if (call) {
+                        startCall(call);
+                    }
+                }
+            });
+
+            // End call button
+            endCallBtn.addEventListener('click', endCall);
+
+            // User name input
+            userNameInput.addEventListener('change', (e) => {
+                appState.currentUser = e.target.value || "Guest User";
+                currentParticipantName.textContent = appState.currentUser;
+            });
+
+            // Fullscreen buttons (existing functionality)
+            setupFullscreenButtons();
+        }
+
+        // Start a call
+        async function startCall(callInfo) {
+            try {
+                appState.currentCall = callInfo;
+                appState.isInCall = true;
+                
+                // Update participant name
+                currentParticipantName.textContent = `${appState.currentUser} - ${callInfo.name}`;
+                
+                // Switch to call screen
+                switchToScene('call-screen');
+                
+                // Start camera
+                await startCamera();
+                
+                // Add to call history if not already there
+                if (!appState.callHistory.some(c => c.id === callInfo.id)) {
+                    appState.callHistory.unshift(callInfo);
+                    if (appState.callHistory.length > 10) {
+                        appState.callHistory.pop();
+                    }
+                    renderCallList();
+                }
+                
+            } catch (error) {
+                console.error('Error starting call:', error);
+                alert('Failed to start camera. Please check your permissions.');
+                switchToScene('start-screen');
+            }
+        }
+
+        // End current call
+        function endCall() {
+            if (appState.mediaStream) {
+                appState.mediaStream.getTracks().forEach(track => track.stop());
+                appState.mediaStream = null;
+            }
+            
+            appState.currentCall = null;
+            appState.isInCall = false;
+            
+            // Reset video elements
+            video1.srcObject = null;
+            video2.srcObject = null;
+            
+            // Switch back to start screen
+            switchToScene('start-screen');
+        }
+
+        // Switch between scenes
+        function switchToScene(sceneId) {
+            // Hide all scenes
+            document.querySelectorAll('.scene').forEach(scene => {
+                scene.classList.remove('active');
+            });
+            
+            // Show target scene
+            const targetScene = document.getElementById(sceneId);
+            if (targetScene) {
+                targetScene.classList.add('active');
+            }
+            
+            // If switching to start screen, update call list
+            if (sceneId === 'start-screen') {
+                renderCallList();
+            }
+        }
+
+        // Start camera (existing functionality)
+        async function startCamera() {
+            try {
+                if (appState.mediaStream) {
+                    appState.mediaStream.getTracks().forEach(track => track.stop());
+                }
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+                
+                appState.mediaStream = stream;
+                video1.srcObject = stream;
+                video2.srcObject = stream;
+                
+            } catch (err) {
+                console.error('Camera error:', err);
+                throw err;
+            }
+        }
+
+        // Fullscreen functionality (existing)
+        function setupFullscreenButtons() {
+            const fullscreenButtons = document.querySelectorAll('.fullscreen-btn');
+            
+            fullscreenButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetVideoId = this.getAttribute('data-target');
+                    const videoElement = document.getElementById(targetVideoId);
+                    toggleFullscreen(videoElement, this);
+                });
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && document.fullscreenElement) {
+                    document.exitFullscreen();
+                    updateButtonStates();
+                }
+            });
+
+            document.addEventListener('fullscreenchange', updateButtonStates);
+        }
+
+        function toggleFullscreen(element, button) {
+            if (!document.fullscreenElement) {
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                } else if (element.mozRequestFullScreen) {
+                    element.mozRequestFullScreen();
+                } else if (element.webkitRequestFullscreen) {
+                    element.webkitRequestFullscreen();
+                } else if (element.msRequestFullscreen) {
+                    element.msRequestFullscreen();
+                }
+                button.classList.add('fullscreen');
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) {
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+                button.classList.remove('fullscreen');
+            }
+        }
+
+        function updateButtonStates() {
+            const buttons = document.querySelectorAll('.fullscreen-btn');
+            buttons.forEach(button => {
+                const targetVideoId = button.getAttribute('data-target');
+                const videoElement = document.getElementById(targetVideoId);
+                
+                if (document.fullscreenElement === videoElement) {
+                    button.classList.add('fullscreen');
+                } else {
+                    button.classList.remove('fullscreen');
+                }
+            });
+        }
+
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>

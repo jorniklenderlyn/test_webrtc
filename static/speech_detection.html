@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Speech Detection</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f0f2f5;
+      font-family: Arial, sans-serif;
+    }
+    #status {
+      font-size: 2rem;
+      font-weight: bold;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: all 0.2s ease;
+    }
+    .speaking {
+      color: #e74c3c;
+    }
+    .silent {
+      color: #7f8c8d;
+    }
+  </style>
+</head>
+<body>
+  <div id="status" class="silent">🔇 Silent</div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    let audioContext;
+    let analyser;
+    let microphone;
+    let javascriptNode;
+    let isSpeaking = false;
+    const threshold = 0.25; // Adjust sensitivity here
+    const speakingTimeoutMs = 300; // How long to wait before declaring silence
+
+    let silenceTimer = null;
+
+    async function initAudio() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        microphone = audioContext.createMediaStreamSource(stream);
+        javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+        microphone.connect(analyser);
+        analyser.connect(javascriptNode);
+        javascriptNode.connect(audioContext.destination);
+
+        javascriptNode.onaudioprocess = () => {
+          const array = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(array);
+          const volume = array.reduce((sum, val) => sum + val, 0) / array.length / 255;
+
+          if (volume > threshold) {
+            if (!isSpeaking) {
+              isSpeaking = true;
+              statusEl.textContent = '🗣️ Speaking';
+              statusEl.className = 'speaking';
+            }
+            // Reset silence timer
+            if (silenceTimer) clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(() => {
+              isSpeaking = false;
+              statusEl.textContent = '🔇 Silent';
+              statusEl.className = 'silent';
+            }, speakingTimeoutMs);
+          }
+        };
+      } catch (err) {
+        console.error('Microphone access denied or not supported:', err);
+        statusEl.textContent = '⚠️ Mic denied';
+        statusEl.className = 'silent';
+      }
+    }
+
+    // Start when user interacts (required by browsers)
+    document.addEventListener('click', () => {
+      if (!audioContext) initAudio();
+    }, { once: true });
+  </script>
+</body>
+</html>
