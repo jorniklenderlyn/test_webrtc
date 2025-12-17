@@ -46,7 +46,7 @@ function switchToScene(sceneId) {
     
     // If switching to start screen, update call list
     if (sceneId === 'start-screen') {
-        createSnow();
+        createSnowflake();
         // renderCallList();
     }
 }
