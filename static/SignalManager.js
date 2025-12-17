@@ -186,13 +186,13 @@ class SignalManager {
             
         const offer = await this.peerConnection.createOffer();
 
+        await this.peerConnection.setLocalDescription(offer);
+
         this.sendSignaling({
             type: 'offer',
             sdp: offer.sdp,
             target: callerId
         })
-
-        await this.peerConnection.setLocalDescription(offer);
 
         console.log('send offer');
     }
@@ -210,14 +210,14 @@ class SignalManager {
         await this.peerConnection.setRemoteDescription(offer);
         
         const answer = await this.peerConnection.createAnswer();
-        
+
+        await this.peerConnection.setLocalDescription(answer);
+
         this.sendSignaling({
             type: 'answer',
             sdp: answer.sdp,
             target: senderId
         });
-
-        await this.peerConnection.setLocalDescription(answer);
 
         console.log('send answer')
     }
