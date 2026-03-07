@@ -2,6 +2,13 @@ services:
   webrtc-app:
     build: .
     network_mode: "host"
+    environment:
+      - ALLOWED_ORIGINS=*
+      - TURN_URLS=turn:155.212.168.250:3478?transport=udp,turn:155.212.168.250:3478?transport=tcp
+      - TURN_USERNAME=test
+      - TURN_CREDENTIAL=secret
+      - STUN_URLS=stun:stun.l.google.com:19302
+      - ICE_TRANSPORT_POLICY=all
     # ports:
       # - "443:8000"   # HTTPS port (not 8080)
     volumes:

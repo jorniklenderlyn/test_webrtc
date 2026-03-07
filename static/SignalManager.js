@@ -1,31 +1,14 @@
-const serversConfig = {
-    iceServers: [
-        // STUN (may fail, but try anyway)
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun.voipbuster.com:3478" },
-        { urls: "stun:stun.freeswitch.org:3478" },
-        { urls: "stun:stun.miwifi.com:3478" },
-        // TURN over TCP on port 443 (fallback that always works)
-        {
-        urls: [
-            "turn:155.212.168.250:3478?transport=tcp",
-            "turn:155.212.168.250:3478?transport=udp",
-            // "turn:195.133.198.89:3478?transport=udp",
-            // "turn:127.0.0.1:443?transport=tcp"
-        ],
-        username: "test",
-        credential: "secret"
-        }
-    ],
-    // iceTransportPolicy: "relay", // ← CRITICAL: ONLY use relay (TURN)
-    // sdpSemantics: 'unified-plan'
-}
+const defaultServersConfig = {
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceTransportPolicy: "all"
+};
 
 // Simple frontend to demonstrate usage
 class SignalManager {
     constructor() {
         this.ws = null;
         this.peerConnection = null;
+        this.serversConfig = defaultServersConfig;
         this.localVideo = document.getElementById('video1');
         this.remoteVideo = document.getElementById('video2');
         this.userId = null;
@@ -36,6 +19,7 @@ class SignalManager {
     }
 
     async connect(url) {
+        await this.loadIceConfig();
         this.ws = new WebSocket(url);
         
         this.ws.onopen = () => {
@@ -51,6 +35,22 @@ class SignalManager {
             console.log('Disconnected from signaling server');
             this.cleanup();
         };
+    }
+
+    async loadIceConfig() {
+        try {
+            const response = await fetch('/ice-config');
+            if (!response.ok) {
+                throw new Error(`failed to load /ice-config: ${response.status}`);
+            }
+            const config = await response.json();
+            if (config && Array.isArray(config.iceServers) && config.iceServers.length > 0) {
+                this.serversConfig = config;
+            }
+        } catch (error) {
+            console.warn('Using default ICE config:', error);
+            this.serversConfig = defaultServersConfig;
+        }
     }
 
     handleSignalingMessage(message) {
@@ -111,7 +111,7 @@ class SignalManager {
     }
 
     async setupPeerConnection(targetId) {
-        this.peerConnection = new RTCPeerConnection(serversConfig)
+        this.peerConnection = new RTCPeerConnection(this.serversConfig)
 
         // Add local stream
         const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });

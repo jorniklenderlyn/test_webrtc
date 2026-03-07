@@ -1,16 +1,29 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from typing import Dict, Optional
-import uuid
+import base64
+import hashlib
+import hmac
 import json
 import os
-from dataclasses import dataclass 
-from typing import Dict
-import uuid 
+import time
+import uuid
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 
-app = FastAPI()
+app = FastAPI(title="WebRTC Signaling Server")
+
+allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins or ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @dataclass
@@ -19,8 +32,7 @@ class User:
     name: str
     websocket: WebSocket
 
-    def to_dict(self) -> dict:
-        """Conver user to dictionary for JSON serialization"""
+    def to_dict(self) -> Dict[str, str]:
         return {
             "id": self.id,
             "name": self.name,
@@ -28,241 +40,325 @@ class User:
 
 
 class ConnectionManager:
-    def __init__(self):
-        # Store active connections: {user_id: websocket}
+    def __init__(self) -> None:
         self.active_connections: Dict[str, User] = {}
-        # Store call pairs: {caller_id: callee_id, callee_id: caller_id}
         self.call_pairs: Dict[str, str] = {}
 
-    async def connect(self, websocket: WebSocket, username: str) -> str:
+    async def connect(self, websocket: WebSocket, user_id: Optional[str], username: str) -> str:
         await websocket.accept()
-        user_id = str(uuid.uuid4())
-        user = User(id=user_id, name=username, websocket=websocket)
-        self.active_connections[user_id] = user
-        print(f"User connected: {user_id} ({username})")
 
-        join_message = {
-            "type": "user_joined",
-            "user": user.to_dict()
-        }
+        safe_user_id = (user_id or "").strip().strip('"\'')
+        if not safe_user_id:
+            safe_user_id = str(uuid.uuid4())
 
-        for uid in self.active_connections:
-            if uid != user_id:  # Don't send to self
-                await self.send_message(uid, join_message)
+        final_user_id = safe_user_id
+        if final_user_id in self.active_connections:
+            suffix = str(uuid.uuid4())[:8]
+            final_user_id = f"{safe_user_id}-{suffix}"
 
-        return user_id
+        user = User(id=final_user_id, name=username, websocket=websocket)
+        self.active_connections[final_user_id] = user
 
-    def disconnect(self, user_id: str):
-        if user_id in self.active_connections:
-            del self.active_connections[user_id]
+        await self._broadcast(
+            {
+                "type": "user_joined",
+                "user": user.to_dict(),
+            },
+            skip_user_id=final_user_id,
+        )
+
+        return final_user_id
+
+    async def disconnect(self, user_id: str) -> None:
+        if user_id not in self.active_connections:
+            return
+
+        del self.active_connections[user_id]
+
         if user_id in self.call_pairs:
-            partner_id = self.call_pairs[user_id]
-            del self.call_pairs[user_id]
-            if partner_id in self.call_pairs:
+            partner_id = self.call_pairs.pop(user_id)
+            if self.call_pairs.get(partner_id) == user_id:
                 del self.call_pairs[partner_id]
-            if partner_id in self.active_connections:
-                message = {
+            await self.send_message(
+                partner_id,
+                {
                     "type": "call_ended",
-                    "sender": user_id
-                }
-                self.send_message(partner_id, message)
-        
-        print(f"User disconnected: {user_id}")
+                    "sender": user_id,
+                },
+            )
 
-        leave_message = {
-            "type": "user_left",
-            "user_id": user_id
-        }
+        await self._broadcast(
+            {
+                "type": "user_left",
+                "user_id": user_id,
+            }
+        )
 
-        return leave_message
-        
-    async def send_message(self, user_id: str, message: dict):
-        if user_id in self.active_connections:
-            try:
-                await self.active_connections[user_id].websocket.send_json(message)
-            except WebSocketDisconnect:
-                self.disconnect(user_id)
+    async def send_message(self, user_id: str, message: Dict[str, Any]) -> None:
+        if user_id not in self.active_connections:
+            return
+        try:
+            await self.active_connections[user_id].websocket.send_json(message)
+        except WebSocketDisconnect:
+            await self.disconnect(user_id)
 
-    async def broadcast_users_list(self):
-        users_list = {
-            "type": "users_list",
-            "users": [self.active_connections[user_id].to_dict() for user_id in self.active_connections]
-        }
-        for user_id in self.active_connections:
-            await self.send_message(user_id, users_list)
+    async def _broadcast(self, message: Dict[str, Any], skip_user_id: Optional[str] = None) -> None:
+        recipients = [uid for uid in self.active_connections if uid != skip_user_id]
+        for uid in recipients:
+            await self.send_message(uid, message)
 
-    async def handle_signaling(self, sender_id: str, message: dict):
-        # print(message["type"], [k for k in message])
+    async def broadcast_users_list(self) -> None:
+        users = [u.to_dict() for u in self.active_connections.values()]
+        await self._broadcast(
+            {
+                "type": "users_list",
+                "users": users,
+            }
+        )
+
+    async def handle_signaling(self, sender_id: str, message: Dict[str, Any]) -> None:
         msg_type = message.get("type")
+
+        if msg_type == "ping":
+            await self.send_message(sender_id, {"type": "pong", "ts": int(time.time())})
+            return
+
+        if msg_type == "change-name":
+            new_name = (message.get("name") or "").strip()
+            if not new_name:
+                await self.send_message(sender_id, {"type": "error", "message": "name is required"})
+                return
+            self.active_connections[sender_id].name = new_name
+            await self.broadcast_users_list()
+            return
+
+        if msg_type == "chat_message":
+            target_id = message.get("target")
+            payload = {
+                "type": "chat_message",
+                "sender": sender_id,
+                "message": message.get("message", ""),
+                "meta": message.get("meta", {}),
+                "ts": int(time.time() * 1000),
+            }
+            if target_id:
+                await self.send_message(target_id, payload)
+            else:
+                await self._broadcast(payload, skip_user_id=sender_id)
+            return
+
+        if msg_type == "signal":
+            target_id = message.get("target") or message.get("to")
+            data = message.get("data")
+            if not target_id or data is None:
+                await self.send_message(sender_id, {"type": "error", "message": "signal.target and signal.data are required"})
+                return
+            await self.send_message(
+                target_id,
+                {
+                    "type": "signal",
+                    "sender": sender_id,
+                    "data": data,
+                },
+            )
+            return
 
         if msg_type == "incoming_call":
             target_id = message.get("target")
             if target_id in self.active_connections:
-                await self.send_message(target_id, {
-                    "type": "incoming_call",
-                    "user": self.active_connections[sender_id].to_dict()
-                })
+                await self.send_message(
+                    target_id,
+                    {
+                        "type": "incoming_call",
+                        "user": self.active_connections[sender_id].to_dict(),
+                    },
+                )
             else:
-                await self.send_message(target_id, {
-                    "type": "error",
-                    "message": "target not active"
-                })
-        
+                await self.send_message(sender_id, {"type": "error", "message": "target not active"})
+            return
+
         if msg_type == "cancel_call":
             target_id = message.get("target")
             if target_id in self.active_connections:
-                await self.send_message(target_id, {
-                    "type": "cancel_call",
-                    "callee": sender_id
-                })
-        
+                await self.send_message(target_id, {"type": "cancel_call", "callee": sender_id})
+            return
+
         if msg_type == "offer":
-            # Store the offer and notify the receiver
             target_id = message.get("target")
             sdp = message.get("sdp")
             if target_id in self.active_connections and sdp:
-                await self.send_message(target_id, {
-                    "type": "offer",
-                    "sdp": sdp,
-                    "sender": sender_id
-                })
+                await self.send_message(
+                    target_id,
+                    {
+                        "type": "offer",
+                        "sdp": sdp,
+                        "sender": sender_id,
+                    },
+                )
                 self.call_pairs[sender_id] = target_id
                 self.call_pairs[target_id] = sender_id
             else:
-                await self.send_message(sender_id, {
-                    "type": "error",
-                    "details": f"target_id: {target_id}, sdp: {sdp}"
-                })
-        
-        elif msg_type == "answer":
-            # Send answer to the original caller
-            target_id = message.get('target')
-            if target_id in self.active_connections:
-                await self.send_message(target_id, {
-                    "type": "answer",
-                    "sdp": message.get("sdp"),
-                    "callee": sender_id
-                })
-            # Create call pair
-            # self.call_pairs[caller_id] = sender_id
-            # self.call_pairs[sender_id] = caller_id
-        
-        elif msg_type == "ice_candidate":
-            # Forward ICE candidate to the partner
-            if sender_id in self.call_pairs:
-                partner_id = self.call_pairs[sender_id]
-                await self.send_message(partner_id, {
-                    "type": "ice_candidate",
-                    "candidate": message.get("candidate"),
-                    "sender": sender_id
-                })
-        
-        elif msg_type == "call_rejected":
-            # Handle call rejection
+                await self.send_message(sender_id, {"type": "error", "message": "invalid offer payload"})
+            return
+
+        if msg_type == "answer":
             target_id = message.get("target")
             if target_id in self.active_connections:
-                await self.send_message(target_id, {
-                    "type": "call_rejected",
-                    "callee": sender_id
-                })
-        
-        elif msg_type == "call_ended":
-            # Handle call end
+                await self.send_message(
+                    target_id,
+                    {
+                        "type": "answer",
+                        "sdp": message.get("sdp"),
+                        "callee": sender_id,
+                    },
+                )
+            return
+
+        if msg_type == "ice_candidate":
+            target_id = message.get("target") or self.call_pairs.get(sender_id)
+            if target_id:
+                await self.send_message(
+                    target_id,
+                    {
+                        "type": "ice_candidate",
+                        "candidate": message.get("candidate"),
+                        "sender": sender_id,
+                    },
+                )
+            return
+
+        if msg_type == "call_rejected":
+            target_id = message.get("target")
+            if target_id in self.active_connections:
+                await self.send_message(target_id, {"type": "call_rejected", "callee": sender_id})
+            return
+
+        if msg_type == "call_ended":
+            target_id = self.call_pairs.get(sender_id) or message.get("target")
+            if target_id:
+                await self.send_message(target_id, {"type": "call_ended", "sender": sender_id})
+
             if sender_id in self.call_pairs:
-                partner_id = self.call_pairs[sender_id]
-                await self.send_message(partner_id, {
-                    "type": "call_ended",
-                    "sender": sender_id
-                })
-                del self.call_pairs[sender_id]
-                if partner_id in self.call_pairs:
-                    del self.call_pairs[partner_id]
-        
-        elif  msg_type == "change-name":
-            print(message)
-            if sender_id in self.active_connections:
-                if 'name' not in message:
-                    raise ValueError('добавьте поле "name"')
-                self.active_connections[sender_id].name = message['name']
-                await self.broadcast_users_list()
+                partner = self.call_pairs.pop(sender_id)
+                if self.call_pairs.get(partner) == sender_id:
+                    del self.call_pairs[partner]
+            return
+
+        await self.send_message(sender_id, {"type": "error", "message": f"unknown message type: {msg_type}"})
+
 
 manager = ConnectionManager()
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    user_id = None
-    try:
-        if 'username' not in websocket.query_params:
-            raise ValueError('необходимо указать имя пользователя ("name" query param required)')
-        
-        username = websocket.query_params['username'].strip('"\'')
 
-        user_id = await manager.connect(websocket, username)
-        
-        # Send initial users list to the new user
-        await manager.send_message(user_id, {
-            "type": "self_id",
-            "user_id": user_id
-        })
-        # await manager.broadcast_users_list()
-        users_list = {
-            "type": "users_list",
-            "users": [manager.active_connections[user_id].to_dict() for user_id in manager.active_connections]
-        }
-        await manager.send_message(user_id, users_list)
-        
+def _build_turn_ice_servers() -> List[Dict[str, Any]]:
+    stun_urls = [u.strip() for u in os.getenv("STUN_URLS", "stun:stun.l.google.com:19302").split(",") if u.strip()]
+
+    turn_urls = [u.strip() for u in os.getenv("TURN_URLS", "").split(",") if u.strip()]
+    turn_username = os.getenv("TURN_USERNAME", "")
+    turn_credential = os.getenv("TURN_CREDENTIAL", "")
+
+    use_rest_auth = os.getenv("TURN_USE_REST_AUTH", "false").lower() == "true"
+    turn_secret = os.getenv("TURN_SECRET", "")
+    turn_realm = os.getenv("TURN_REALM", "example.com")
+    turn_ttl = int(os.getenv("TURN_TTL_SECONDS", "86400"))
+
+    servers: List[Dict[str, Any]] = [{"urls": url} for url in stun_urls]
+
+    if not turn_urls:
+        return servers
+
+    if use_rest_auth and turn_secret:
+        expires = int(time.time()) + turn_ttl
+        username = f"{expires}:webrtc"
+        digest = hmac.new(turn_secret.encode("utf-8"), username.encode("utf-8"), hashlib.sha1).digest()
+        credential = base64.b64encode(digest).decode("utf-8")
+        servers.append(
+            {
+                "urls": turn_urls,
+                "username": username,
+                "credential": credential,
+                "realm": turn_realm,
+            }
+        )
+    elif turn_username and turn_credential:
+        servers.append(
+            {
+                "urls": turn_urls,
+                "username": turn_username,
+                "credential": turn_credential,
+            }
+        )
+
+    return servers
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    username: Optional[str] = Query(default=None),
+    user_id: Optional[str] = Query(default=None),
+) -> None:
+    session_user_id: Optional[str] = None
+
+    try:
+        name = (username or "").strip().strip('"\'') or f"guest-{uuid.uuid4().hex[:6]}"
+        session_user_id = await manager.connect(websocket, user_id=user_id, username=name)
+
+        await manager.send_message(
+            session_user_id,
+            {
+                "type": "self_id",
+                "user_id": session_user_id,
+            },
+        )
+
+        await manager.send_message(
+            session_user_id,
+            {
+                "type": "users_list",
+                "users": [u.to_dict() for u in manager.active_connections.values()],
+            },
+        )
+
         while True:
-            data = await websocket.receive_text()
+            raw_data = await websocket.receive_text()
             try:
-                message = json.loads(data)
-                await manager.handle_signaling(user_id, message)
+                message = json.loads(raw_data)
             except json.JSONDecodeError:
-                print(f"Invalid JSON received from user {user_id}")
-            except Exception as e:
-                print(f"Error processing message: {e}")
-    
+                await manager.send_message(session_user_id, {"type": "error", "message": "Invalid JSON"})
+                continue
+
+            await manager.handle_signaling(session_user_id, message)
+
     except WebSocketDisconnect:
-        if user_id:
-            leave_msg = manager.disconnect(user_id)  # Now returns leave message
-            if leave_msg:
-                # Broadcast "user_left" to all remaining users
-                for uid in manager.active_connections:
-                    await manager.send_message(uid, leave_msg)
-                # Also update the full list for consistency
-                # await manager.broadcast_users_list()
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-        if user_id:
-            leave_msg = manager.disconnect(user_id)  # Now returns leave message
-            if leave_msg:
-                # Broadcast "user_left" to all remaining users
-                for uid in manager.active_connections:
-                    await manager.send_message(uid, leave_msg)
-                # Also update the full list for consistency
-                # await manager.broadcast_users_list()
+        if session_user_id:
+            await manager.disconnect(session_user_id)
+    except Exception as exc:
+        print(f"WebSocket error for user {session_user_id}: {exc}")
+        if session_user_id:
+            await manager.disconnect(session_user_id)
+
 
 @app.get("/")
-async def get():
+async def health() -> Dict[str, Any]:
     return {
-        "message": "WebRTC Signaling Server",
-        "websocket_endpoint": "/ws",
-        "instructions": "Connect to WebSocket endpoint to start signaling"
+        "message": "WebRTC signaling server is running",
+        "websocket_endpoint": "/ws?username=<name>&user_id=<optional-id>",
+        "ice_config_endpoint": "/ice-config",
     }
 
-app.mount("/static", StaticFiles(directory="static"))
 
-# @app.get("/app")
-# async def index():
-#     return FileResponse(path='static/index.html')
+@app.get("/ice-config")
+async def get_ice_config() -> Dict[str, Any]:
+    return {
+        "iceServers": _build_turn_ice_servers(),
+        "iceTransportPolicy": os.getenv("ICE_TRANSPORT_POLICY", "all"),
+    }
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/app")
-async def index():
-    return FileResponse(path='static/scene.html')
-
-if __name__ == "__main__":
-    import uvicorn
-
-    cert_dir = os.path.join(os.getcwd(), 'certs')
-    cert_path = os.path.join(cert_dir, 'cert.pem')
-    key_path = os.path.join(cert_dir, 'key.pem')
-    uvicorn.run(app, host="0.0.0.0", port=8001, ssl_certfile=cert_path, ssl_keyfile=key_path)
+async def index() -> FileResponse:
+    return FileResponse(path="static/scene.html")
